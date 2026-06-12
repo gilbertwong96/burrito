@@ -46,7 +46,10 @@ pub fn launch(io: Io, install_dir: []const u8, env_map: *std.process.Environ.Map
         release_cookie_content = cookie;
     }
 
-    // Set all the required release arguments
+    // Set all the required release arguments. CLI args are passed
+    // through native argv (after `-extra` below) and reach the BEAM
+    // via :init.get_plain_arguments/0.
+
     const erlang_cli = &[_][]const u8{
         erl_bin_path[0..],
         "-elixir ansi_enabled true",
@@ -67,43 +70,23 @@ pub fn launch(io: Io, install_dir: []const u8, env_map: *std.process.Environ.Map
         "-extra",
     };
 
-    if (builtin.os.tag == .windows) {
-        // Fix up Windows 10+ consoles having ANSI escape support, but only if we set some flags
-        const final_args = try std.mem.concat(allocator, []const u8, &.{ erlang_cli, args_trimmed });
+    // Cross-platform: build args once, set env, spawn child, wait for exit
+    const final_args = try std.mem.concat(allocator, []const u8, &.{ erlang_cli, args_trimmed });
 
-        try env_map.put("RELEASE_ROOT", install_dir);
-        try env_map.put("RELEASE_SYS_CONFIG", config_sys_path_no_ext);
-        try env_map.put("__BURRITO", "1");
-        try env_map.put("__BURRITO_BIN_PATH", self_path);
+    log.debug("CLI List: {any}", .{final_args});
 
-        var win_child_proc = std.process.Child.init(final_args, allocator);
-        win_child_proc.env_map = env_map;
-        win_child_proc.stdout_behavior = .Inherit;
-        win_child_proc.stdin_behavior = .Inherit;
+    try env_map.put("RELEASE_ROOT", install_dir);
+    try env_map.put("RELEASE_SYS_CONFIG", config_sys_path_no_ext);
+    try env_map.put("__BURRITO", "1");
+    try env_map.put("__BURRITO_BIN_PATH", self_path);
 
-        log.debug("CLI List: {any}", .{final_args});
-
-        const win_term = try win_child_proc.spawnAndWait();
-        switch (win_term) {
-            .Exited => |code| {
-                std.process.exit(code);
-            },
-            else => std.process.exit(1),
-        }
-    } else {
-        const final_args = try std.mem.concat(allocator, []const u8, &.{ erlang_cli, args_trimmed });
-
-        log.debug("CLI List: {any}", .{final_args});
-
+    // Unix: set ROOTDIR, BINDIR, LD_LIBRARY_PATH for NIF .so files
+    if (builtin.os.tag != .windows) {
         try env_map.put("ROOTDIR", install_dir[0..]);
         try env_map.put("BINDIR", erts_bin_path[0..]);
-        try env_map.put("RELEASE_ROOT", install_dir);
-        try env_map.put("RELEASE_SYS_CONFIG", config_sys_path_no_ext);
-        try env_map.put("__BURRITO", "1");
-        try env_map.put("__BURRITO_BIN_PATH", self_path);
 
         // Extend LD_LIBRARY_PATH so NIF .so files can find system shared
-        // libraries (e.g. libgcc_s.so.1) when using a custom glibc ERTS
+        // libraries (e.g. libgcc_s.so.1) when using a custom ERTS
         const system_lib_paths = "/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/lib:/usr/lib";
         if (env_map.get("LD_LIBRARY_PATH")) |existing| {
             const combined = try std.fmt.allocPrint(allocator, "{s}:{s}", .{ existing, system_lib_paths });
@@ -111,10 +94,15 @@ pub fn launch(io: Io, install_dir: []const u8, env_map: *std.process.Environ.Map
         } else {
             try env_map.put("LD_LIBRARY_PATH", system_lib_paths);
         }
+    }
 
-        return std.process.replace(io, .{
-            .argv = final_args,
-            .environ_map = env_map,
-        });
+    var child = try std.process.spawn(io, .{
+        .argv = final_args,
+        .environ_map = env_map,
+    });
+    const term = try child.wait(io);
+    switch (term) {
+        .exited => |code| std.process.exit(code),
+        else => std.process.exit(1),
     }
 }

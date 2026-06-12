@@ -46,7 +46,7 @@ pub fn main(init: std.process.Init) !void {
     const environ = init.minimal.environ;
 
     // If on linux, maybe install the musl libc runtime file for our pre-compiled Erlang
-    try maybe_install_musl_runtime(io, arena);
+    if (comptime IS_LINUX) try maybe_install_musl_runtime(io);
 
     const self_path = try std.process.executablePathAlloc(io, arena);
 
@@ -218,16 +218,14 @@ fn install_dir_error(arena: std.mem.Allocator) void {
     std.process.exit(1);
 }
 
-fn maybe_install_musl_runtime(io: Io, arena: std.mem.Allocator) !void {
-    if (comptime IS_LINUX and !std.mem.eql(u8, build_options.MUSL_RUNTIME_PATH, "")) {
-        // Check if the file was already extracted
-        const cStr = try arena.dupeZ(u8, build_options.MUSL_RUNTIME_PATH);
-        var statBuffer: std.c.Stat = undefined;
-        const statResult = std.c.stat(cStr, &statBuffer);
+fn maybe_install_musl_runtime(io: Io) !void {
+    if (!std.mem.eql(u8, build_options.MUSL_RUNTIME_PATH, "")) {
+        // Check if the file was already extracted using std.fs API (cross-platform)
+        const file_exists = Io.Dir.cwd().statFile(io, build_options.MUSL_RUNTIME_PATH, .{}) catch null;
 
-        if (statResult == 0) {
+        if (file_exists != null) {
             // File exists
-            log.debug("The musl runtime file is already preset. Continuing.", .{});
+            log.debug("The musl runtime file is already present. Continuing.", .{});
             return;
         }
 
@@ -237,7 +235,7 @@ fn maybe_install_musl_runtime(io: Io, arena: std.mem.Allocator) !void {
         };
         defer file.close(io);
 
-        const exec_permissions = Io.File.Permissions.unixNew(0o754);
+        const exec_permissions = Io.File.Permissions.fromMode(@intCast(0o754));
         try file.setPermissions(io, exec_permissions);
 
         const MUSL_RUNTIME_BYTES = @embedFile("musl-runtime.so");
