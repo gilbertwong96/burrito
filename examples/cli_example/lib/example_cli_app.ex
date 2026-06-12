@@ -3,6 +3,7 @@ defmodule ExampleCliApp do
     args = Burrito.Util.Args.get_arguments()
 
     IO.puts("My arguments are: #{inspect(args)}")
+    IO.puts("Number of args: #{length(args)}")
     IO.puts("I was started from: #{Burrito.Util.Args.get_bin_path()}")
 
     test_release_cookie()
@@ -14,6 +15,22 @@ defmodule ExampleCliApp do
     IO.write("Testing Sqlite...")
     test_sqlite()
     IO.write("OK\n")
+
+    # Exit with non-zero status if we expected args but got none, so the
+    # CI matrix can detect a regression in the wrapper's argument passing.
+    expected_args = System.get_env("EXPECTED_ARGS")
+
+    if expected_args do
+      expected = String.split(expected_args, " ")
+      actual = args
+
+      if Enum.sort(expected) != Enum.sort(actual) do
+        IO.puts("ERROR: expected args #{inspect(expected)}, got #{inspect(actual)}")
+        System.halt(2)
+      end
+
+      IO.puts("Argument check OK: #{length(actual)} args match expected")
+    end
 
     System.halt(0)
   end
