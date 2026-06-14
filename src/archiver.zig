@@ -94,7 +94,16 @@ pub fn pack_directory(arena: Allocator, path: []const u8, archive_path: []const 
             if (stat.size > 0) {
                 assert(stat.size == try reader.streamRemaining(writer));
             }
-            try writer.writeInt(usize, @intCast(stat.permissions.toMode()), .little);
+            // On Windows, std.fs.File.Permissions is an enum (no
+            // .toMode() method), and POSIX mode bits don't apply.
+            // Write 0 — the archive is read on the same machine that
+            // wrote it, so the receiver can derive permissions from
+            // its own filesystem.
+            const mode: usize = if (builtin.os.tag == .windows)
+                0
+            else
+                @intCast(stat.permissions.toMode());
+            try writer.writeInt(usize, mode, .little);
 
             count += 1;
 
