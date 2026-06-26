@@ -1,23 +1,22 @@
 defmodule Burrito.Util.Args do
   @moduledoc """
-  This module provides a method to help fetch CLI arguments, whether passed down
-  from the Zig wrapper binary or from the the system.
+  Helpers to fetch CLI arguments passed down from the Zig wrapper binary.
+
+  The Zig wrapper launches the BEAM with `-extra <user-args>`, so the
+  arguments reach Elixir through `:init.get_plain_arguments/0`. This
+  module is a thin convenience wrapper around that.
+
+  Outside a Burrito-built context, `:init.get_plain_arguments/0` returns
+  OTP runtime arguments (or `[]`). Use `argv/0` when you need true CLI
+  arguments regardless of the runtime.
   """
 
-  @doc """
-  Get CLI arguments passed down from the Zig wrapper binary. Do note that this will get OTP
-  runtime arguments when called outside of a Burrito-built context. You may consider
-  `argv/0` as a more general alternative.
-  """
-  @spec get_arguments :: list(String.t())
+  @spec get_arguments() :: [String.t()]
   def get_arguments do
-    :init.get_plain_arguments() |> Enum.map(&to_string/1)
+    Enum.map(:init.get_plain_arguments(), &to_string/1)
   end
 
-  @doc """
-  Get the arguments from the CLI, regardless if run under Burrito or not.
-  """
-  @spec argv :: list(String.t())
+  @spec argv() :: [String.t()]
   def argv do
     if Burrito.Util.running_standalone?() do
       get_arguments()
@@ -26,12 +25,8 @@ defmodule Burrito.Util.Args do
     end
   end
 
-  @doc """
-  Returns the path of the wrapper binary that launched this application.
-  If not currently inside a Burrito wrapped application, returns `:not_in_burrito`.
-  """
   @spec get_bin_path() :: binary() | :not_in_burrito
-  def get_bin_path() do
+  def get_bin_path do
     env_value = System.get_env("__BURRITO_BIN_PATH")
 
     if env_value != nil do
