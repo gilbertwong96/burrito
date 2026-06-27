@@ -52,9 +52,13 @@ pub fn launch(io: Io, install_dir: []const u8, env_map: *std.process.Environ.Map
 
     const erlang_cli = &[_][]const u8{
         erl_bin_path[0..],
-        "-elixir ansi_enabled true",
+        "-elixir",
+        "ansi_enabled",
+        "true",
         "-noshell",
-        "-s elixir start_cli",
+        "-s",
+        "elixir",
+        "start_cli",
         "-mode embedded",
         "-setcookie",
         release_cookie_content,
@@ -96,6 +100,8 @@ pub fn launch(io: Io, install_dir: []const u8, env_map: *std.process.Environ.Map
         }
     }
 
+    // Spawn child and wait for exit.
+    // The BEAM's exit code becomes the Burrito binary's exit code.
     var child = try std.process.spawn(io, .{
         .argv = final_args,
         .environ_map = env_map,
