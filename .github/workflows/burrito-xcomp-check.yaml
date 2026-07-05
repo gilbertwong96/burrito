@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         host: [ubuntu-latest, macos-latest]
-        zig: ["0.15.2", "0.16.0"]
+        zig: ["0.16.0"]
     steps:
       # Deps
       - uses: actions/checkout@v4
@@ -42,7 +42,7 @@ jobs:
       - run: sudo apt-get -y install xz-utils
         if: matrix.host == 'ubuntu-latest'
 
-      - run: brew install elixir xz
+      - run: brew install xz
         if: matrix.host == 'macos-latest'
 
       # Restore Cache
@@ -96,7 +96,7 @@ jobs:
       fail-fast: false
       matrix:
         host: [ubuntu-latest, macos-latest]
-        zig: ["0.15.2", "0.16.0"]
+        zig: ["0.16.0"]
     runs-on: windows-latest
     steps:
       - name: Download a single artifact
@@ -111,7 +111,7 @@ jobs:
       fail-fast: false
       matrix:
         host: [ubuntu-latest, macos-latest]
-        zig: ["0.15.2", "0.16.0"]
+        zig: ["0.16.0"]
     runs-on: ubuntu-latest
     steps:
       - name: Download a single artifact
@@ -127,7 +127,7 @@ jobs:
       fail-fast: false
       matrix:
         host: [ubuntu-latest, macos-latest]
-        zig: ["0.15.2", "0.16.0"]
+        zig: ["0.16.0"]
     runs-on: macos-latest
     steps:
       - name: Download a single artifact
